@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AI Resume Screener</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
+      --accent: #6ee7b7; --accent2: #818cf8; --text: #e2e8f0;
+      --muted: #64748b; --error: #f87171;
+    }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 2rem; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0;
+      background-image: linear-gradient(rgba(110,231,183,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(110,231,183,0.03) 1px, transparent 1px);
+      background-size: 40px 40px; pointer-events: none; z-index: 0;
+    }
+    body::after {
+      content: ''; position: fixed; top: -200px; right: -200px;
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, rgba(129,140,248,0.08) 0%, transparent 70%);
+      pointer-events: none; z-index: 0;
+    }
+    .container { position: relative; z-index: 1; width: 100%; max-width: 560px; }
+    .header { margin-bottom: 2.5rem; animation: fadeDown 0.6s ease both; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(110,231,183,0.1); border: 1px solid rgba(110,231,183,0.2);
+      color: var(--accent); font-size: 0.7rem; font-weight: 600;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 4px 12px; border-radius: 100px; margin-bottom: 1rem;
+    }
+    .badge::before {
+      content: ''; width: 6px; height: 6px; background: var(--accent);
+      border-radius: 50%; animation: pulse 2s infinite;
+    }
+    h1 {
+      font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800;
+      line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 0.75rem;
+    }
+    h1 span {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    }
+    .subtitle { color: var(--muted); font-size: 0.95rem; line-height: 1.6; font-weight: 300; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 2rem;
+      animation: fadeUp 0.6s ease 0.1s both; position: relative; overflow: hidden;
+    }
+    .card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(110,231,183,0.3), transparent);
+    }
+    .field { margin-bottom: 1.25rem; }
+    label {
+      display: block; font-size: 0.78rem; font-weight: 600;
+      letter-spacing: 0.05em; text-transform: uppercase;
+      color: var(--muted); margin-bottom: 0.5rem;
+    }
+    input[type="text"], input[type="email"] {
+      width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.75rem 1rem; color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 0.95rem; outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    input[type="text"]:focus, input[type="email"]:focus {
+      border-color: rgba(110,231,183,0.4); box-shadow: 0 0 0 3px rgba(110,231,183,0.06);
+    }
+    input::placeholder { color: var(--muted); opacity: 0.6; }
+    select {
+      width: 100%; background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 10px; padding: 0.75rem 1rem; color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 0.95rem; outline: none;
+      cursor: pointer; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2364748b' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 1rem center;
+      transition: border-color 0.2s;
+    }
+    select:focus { border-color: rgba(110,231,183,0.4); box-shadow: 0 0 0 3px rgba(110,231,183,0.06); }
+    select option { background: #1a1a2e; }
+    .other-role-field { display: none; margin-top: 0.75rem; }
+    .other-role-field.visible { display: block; animation: fadeUp 0.3s ease both; }
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: 12px; padding: 2rem;
+      text-align: center; cursor: pointer; transition: all 0.2s;
+      position: relative; background: rgba(255,255,255,0.01);
+    }
+    .upload-area:hover, .upload-area.dragover {
+      border-color: rgba(110,231,183,0.4); background: rgba(110,231,183,0.03);
+    }
+    .upload-area input[type="file"] {
+      position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+    }
+    .upload-icon {
+      width: 44px; height: 44px; background: rgba(110,231,183,0.1);
+      border-radius: 12px; display: flex; align-items: center;
+      justify-content: center; margin: 0 auto 0.75rem; font-size: 1.2rem;
+    }
+    .upload-text { font-size: 0.9rem; font-weight: 500; color: var(--text); margin-bottom: 0.25rem; }
+    .upload-hint { font-size: 0.75rem; color: var(--muted); }
+    .file-selected {
+      display: none; align-items: center; gap: 10px;
+      background: rgba(110,231,183,0.08); border: 1px solid rgba(110,231,183,0.2);
+      border-radius: 8px; padding: 0.6rem 0.9rem; margin-top: 0.75rem;
+      font-size: 0.82rem; color: var(--accent);
+    }
+    .file-selected.visible { display: flex; }
+    .processing {
+      display: none; align-items: center; gap: 10px;
+      background: rgba(129,140,248,0.08); border: 1px solid rgba(129,140,248,0.2);
+      border-radius: 8px; padding: 0.6rem 0.9rem; margin-top: 0.75rem;
+      font-size: 0.82rem; color: var(--accent2);
+    }
+    .processing.visible { display: flex; }
+    .processing-spinner {
+      width: 14px; height: 14px; border: 2px solid rgba(129,140,248,0.3);
+      border-top-color: var(--accent2); border-radius: 50%;
+      animation: spin 0.7s linear infinite; flex-shrink: 0;
+    }
+    .btn {
+      width: 100%; padding: 0.9rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 12px; color: #0a0a0f;
+      font-family: 'Syne', sans-serif; font-size: 0.95rem; font-weight: 700;
+      letter-spacing: 0.02em; cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s; margin-top: 0.5rem;
+    }
+    .btn:hover { opacity: 0.92; transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn .spinner {
+      display: none; width: 16px; height: 16px;
+      border: 2px solid rgba(0,0,0,0.3); border-top-color: #000;
+      border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto;
+    }
+    .btn.loading .btn-text { display: none; }
+    .btn.loading .spinner { display: block; }
+    .status {
+      display: none; border-radius: 10px; padding: 1rem 1.25rem;
+      font-size: 0.88rem; line-height: 1.5; margin-top: 1rem;
+    }
+    .status.success {
+      display: block; background: rgba(110,231,183,0.08);
+      border: 1px solid rgba(110,231,183,0.2); color: var(--accent);
+    }
+    .status.error {
+      display: block; background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.2); color: var(--error);
+    }
+    .steps { display: flex; gap: 1rem; margin-top: 2rem; animation: fadeUp 0.6s ease 0.2s both; }
+    .step {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 1rem; text-align: center;
+    }
+    .step-num {
+      font-family: 'Syne', sans-serif; font-size: 1.1rem; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text; margin-bottom: 0.25rem;
+    }
+    .step-text { font-size: 0.72rem; color: var(--muted); line-height: 1.4; }
+    @keyframes fadeDown { from { opacity: 0; transform: translateY(-16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="badge">AI Powered</div>
+    <h1>Submit Your<br/><span>Resume</span></h1>
+    <p class="subtitle">Our AI will screen your resume for any job role and notify you via email within minutes.</p>
+  </div>
+
+  <div class="card">
+    <form id="resumeForm">
+      <div class="field">
+        <label>Full Name</label>
+        <input type="text" id="name" placeholder="e.g. John Doe" required />
+      </div>
+
+      <div class="field">
+        <label>Email Address</label>
+        <input type="email" id="email" placeholder="you@example.com" required />
+      </div>
+
+      <div class="field">
+        <label>Applying For</label>
+        <select id="role" onchange="handleRoleChange(this)">
+          <optgroup label="🖥️ Technology">
+            <option>Software Developer</option>
+            <option>Frontend Developer</option>
+            <option>Backend Developer</option>
+            <option>Full Stack Developer</option>
+            <option>Mobile App Developer</option>
+            <option>Data Scientist</option>
+            <option>Data Analyst</option>
+            <option>Machine Learning Engineer</option>
+            <option>DevOps Engineer</option>
+            <option>Cybersecurity Analyst</option>
+            <option>UI/UX Designer</option>
+          </optgroup>
+          <optgroup label="💼 Business">
+            <option>Business Analyst</option>
+            <option>Product Manager</option>
+            <option>Project Manager</option>
+            <option>Marketing Manager</option>
+            <option>Sales Executive</option>
+            <option>HR Manager</option>
+            <option>Financial Analyst</option>
+            <option>Accountant</option>
+          </optgroup>
+          <optgroup label="🏥 Healthcare">
+            <option>Doctor</option>
+            <option>Nurse</option>
+            <option>Pharmacist</option>
+            <option>Medical Lab Technician</option>
+          </optgroup>
+          <optgroup label="🎓 Education">
+            <option>Teacher</option>
+            <option>Professor</option>
+            <option>Education Counselor</option>
+          </optgroup>
+          <optgroup label="⚙️ Engineering">
+            <option>Mechanical Engineer</option>
+            <option>Civil Engineer</option>
+            <option>Electrical Engineer</option>
+            <option>Chemical Engineer</option>
+          </optgroup>
+          <optgroup label="🎨 Creative">
+            <option>Graphic Designer</option>
+            <option>Content Writer</option>
+            <option>Video Editor</option>
+            <option>Photographer</option>
+          </optgroup>
+          <option value="Other">✏️ Other (specify below)</option>
+        </select>
+        <div class="other-role-field" id="otherRoleField">
+          <input type="text" id="otherRole" placeholder="e.g. Supply Chain Manager, Legal Advisor..." />
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Resume / CV</label>
+        <div class="upload-area" id="uploadArea">
+          <input type="file" id="resumeFile" accept=".pdf,.txt,.doc,.docx,.png,.jpg,.jpeg" />
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">Drop your resume here or click to browse</div>
+          <div class="upload-hint">Supports PDF, DOC, DOCX, TXT, PNG, JPG • Max 10MB</div>
+        </div>
+        <div class="file-selected" id="fileSelected">✅ <span id="fileName"></span></div>
+        <div class="processing" id="processingMsg">
+          <div class="processing-spinner"></div>
+          <span id="processingText">Extracting text from your resume...</span>
+        </div>
+      </div>
+
+      <button type="submit" class="btn" id="submitBtn">
+        <span class="btn-text">Submit Resume →</span>
+        <div class="spinner"></div>
+      </button>
+      <div class="status" id="statusMsg"></div>
+    </form>
+  </div>
+
+  <div class="steps">
+    <div class="step"><div class="step-num">01</div><div class="step-text">Resume uploaded & received</div></div>
+    <div class="step"><div class="step-num">02</div><div class="step-text">AI screens & scores it</div></div>
+    <div class="step"><div class="step-num">03</div><div class="step-text">Result sent to your email</div></div>
+  </div>
+</div>
+
+<script>
+  const WEBHOOK_URL = 'https://n8n-resume-screener.onrender.com/webhook/a72de459-7303-4128-8174-51abfaae6c56';
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const fileInput = document.getElementById('resumeFile');
+  const uploadArea = document.getElementById('uploadArea');
+  const fileSelected = document.getElementById('fileSelected');
+  const fileNameEl = document.getElementById('fileName');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusMsg = document.getElementById('statusMsg');
+  const processingMsg = document.getElementById('processingMsg');
+  const processingText = document.getElementById('processingText');
+
+  function handleRoleChange(select) {
+    const otherField = document.getElementById('otherRoleField');
+    const otherInput = document.getElementById('otherRole');
+    if (select.value === 'Other') {
+      otherField.classList.add('visible');
+      otherInput.required = true;
+    } else {
+      otherField.classList.remove('visible');
+      otherInput.required = false;
+    }
+  }
+
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) {
+      fileNameEl.textContent = fileInput.files[0].name;
+      fileSelected.classList.add('visible');
+    }
+  });
+
+  uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+  uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+  uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      fileInput.files = e.dataTransfer.files;
+      fileNameEl.textContent = file.name;
+      fileSelected.classList.add('visible');
+    }
+  });
+
+  document.getElementById('resumeForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const roleSelect = document.getElementById('role').value;
+    const otherRole = document.getElementById('otherRole').value.trim();
+    const role = roleSelect === 'Other' ? otherRole : roleSelect;
+    const file = fileInput.files[0];
+
+    if (!file) { showStatus('error', '⚠️ Please upload your resume file.'); return; }
+    if (roleSelect === 'Other' && !otherRole) { showStatus('error', '⚠️ Please specify your role.'); return; }
+
+    submitBtn.classList.add('loading');
+    submitBtn.disabled = true;
+    statusMsg.className = 'status';
+    processingMsg.classList.add('visible');
+
+    try {
+      const resumeText = await extractText(file);
+      processingMsg.classList.remove('visible');
+
+      const payload = {
+        candidate_name: name,
+        candidate_email: email,
+        job_role: role,
+        resume_text: `Candidate Name: ${name}\nApplying For: ${role}\n\n${resumeText}`
+      };
+
+      const res = await fetch(WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        showStatus('success', `✅ Resume submitted! We'll email the result to ${email} shortly.`);
+        document.getElementById('resumeForm').reset();
+        fileSelected.classList.remove('visible');
+        document.getElementById('otherRoleField').classList.remove('visible');
+      } else {
+        throw new Error('Server error');
+      }
+    } catch (err) {
+      processingMsg.classList.remove('visible');
+      showStatus('error', '❌ Something went wrong. Make sure n8n is running and try again.');
+    } finally {
+      submitBtn.classList.remove('loading');
+      submitBtn.disabled = false;
+    }
+  });
+
+  async function extractText(file) {
+    const name = file.name.toLowerCase();
+    if (file.type === 'application/pdf' || name.endsWith('.pdf')) {
+      processingText.textContent = 'Extracting text from PDF...';
+      return await extractPDF(file);
+    }
+    if (file.type === 'text/plain' || name.endsWith('.txt')) {
+      processingText.textContent = 'Reading text file...';
+      return await readText(file);
+    }
+    if (file.type.startsWith('image/') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+      processingText.textContent = 'Processing image resume...';
+      return await readImageAsBase64(file);
+    }
+    processingText.textContent = 'Processing document...';
+    return await readText(file);
+  }
+
+  async function extractPDF(file) {
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    let text = '';
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(item => item.str).join(' ') + '\n';
+    }
+    return text.trim() || 'Could not extract PDF text.';
+  }
+
+  function readText(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsText(file, 'utf-8');
+    });
+  }
+
+  function readImageAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(`[IMAGE RESUME: ${file.name}]\nBase64: ${e.target.result.split(',')[1]}`);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showStatus(type, msg) {
+    statusMsg.className = `status ${type}`;
+    statusMsg.textContent = msg;
+  }
+</script>
+</body>
+</html>
