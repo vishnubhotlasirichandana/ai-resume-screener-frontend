@@ -32,3 +32,9 @@ Email Service: Gmail API
 
 ## Why this project matters
 This demonstrates real-world automation, API integration, and cloud deployment.
+
+## Architecture Diagram
+
+![Architecture Diagram](architecture-diagram.png)
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/d647d7b8-ca25-46b0-a6ff-e08f71406350" />
+
